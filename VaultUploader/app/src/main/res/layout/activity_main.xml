@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Vault SO Uploader"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:paddingBottom="12dp"/>
+
+    <EditText
+        android:id="@+id/etKeyHex"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="32字节密钥 hex（64字符）"
+        android:fontFamily="monospace"
+        android:inputType="textNoSuggestions"
+        android:text="deadbeefcafebabe0102030405060708aabbccddeeff00112233445566778899"/>
+
+    <EditText
+        android:id="@+id/etLibName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="库名称（如 mylib）"
+        android:text="mylib"/>
+
+    <EditText
+        android:id="@+id/etServer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="服务器地址"
+        android:text="https://localhost:8443"/>
+
+    <Button
+        android:id="@+id/btnCompile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="① 编译 vault.so"/>
+
+    <Button
+        android:id="@+id/btnUpload"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="② 上传（key=空，so=base64）"/>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp"
+        android:background="#F5F5F5"
+        android:fontFamily="monospace"
+        android:padding="10dp"
+        android:text="等待操作..."
+        android:textSize="12sp"/>
+
+</LinearLayout>
