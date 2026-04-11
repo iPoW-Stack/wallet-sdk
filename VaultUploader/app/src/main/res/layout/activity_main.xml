@@ -36,11 +36,35 @@
         android:hint="服务器地址"
         android:text="https://localhost:8443"/>
 
+    <RadioGroup
+        android:id="@+id/rgOutputFormat"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+        
+        <RadioButton
+            android:id="@+id/rbSharedLib"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=".so (共享库)"
+            android:checked="true"/>
+        
+        <RadioButton
+            android:id="@+id/rbStaticLib"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=".a (静态库)"/>
+    </RadioGroup>
+
     <Button
         android:id="@+id/btnCompile"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="① 编译 vault.so"/>
+        android:text="① 编译 vault"/>
 
     <Button
         android:id="@+id/btnUpload"

@@ -80,6 +80,35 @@ static std::string timestamp_name(const std::string& prefix, const std::string& 
     return ss.str();
 }
 
+// ── 检测文件类型 ──────────────────────────────────────────────────────────────
+static std::string detect_file_type(const std::string& data) {
+    if (data.size() < 8) return ".bin";
+    
+    // ELF 魔数: 0x7f 'E' 'L' 'F'
+    if (data[0] == 0x7f && data[1] == 'E' && data[2] == 'L' && data[3] == 'F') {
+        // 检查 ELF 类型
+        if (data.size() >= 16) {
+            uint16_t e_type = *reinterpret_cast<const uint16_t*>(&data[16]);
+            // ET_DYN (3) = 共享库
+            if (e_type == 3) return ".so";
+            // ET_REL (1) = 可重定位文件 (.o)
+            if (e_type == 1) return ".o";
+        }
+        return ".so"; // 默认为共享库
+    }
+    
+    // AR 魔数: "!<arch>\n"
+    if (data.size() >= 8 && 
+        data[0] == '!' && data[1] == '<' && 
+        data[2] == 'a' && data[3] == 'r' &&
+        data[4] == 'c' && data[5] == 'h' &&
+        data[6] == '>' && data[7] == '\n') {
+        return ".a";
+    }
+    
+    return ".bin"; // 未知格式
+}
+
 // ── JSON 响应 ─────────────────────────────────────────────────────────────────
 static std::string json_resp(bool ok, const std::string& msg, const std::string& extra = "") {
     std::string body = R"({"ok":)" + std::string(ok ? "true" : "false") +
@@ -128,6 +157,45 @@ int main(int argc, char* argv[]) {
            ->end(json_resp(true, "server is running"));
     });
 
+    // ── GET /list ─────────────────────────────────────────────────────────────
+    // 列出已上传的库文件
+    app.get("/list", [](auto* res, auto* /*req*/) {
+        std::string files_json = "[";
+        bool first = true;
+        
+        try {
+            for (const auto& entry : fs::directory_iterator(SO_DIR)) {
+                if (!entry.is_regular_file()) continue;
+                
+                auto path = entry.path();
+                auto size = fs::file_size(path);
+                auto ext = path.extension().string();
+                auto name = path.filename().string();
+                
+                if (!first) files_json += ",";
+                first = false;
+                
+                files_json += "{";
+                files_json += R"("name":")" + name + "\",";
+                files_json += R"("size":)" + std::to_string(size) + ",";
+                files_json += R"("ext":")" + ext + "\",";
+                files_json += R"("path":")" + path.string() + "\"";
+                files_json += "}";
+            }
+        } catch (...) {
+            res->writeStatus("500 Internal Server Error")
+               ->writeHeader("Content-Type", "application/json")
+               ->end(json_resp(false, "failed to list files"));
+            return;
+        }
+        
+        files_json += "]";
+        
+        std::string body = R"({"ok":true,"files":)" + files_json + "}";
+        res->writeHeader("Content-Type", "application/json")
+           ->end(body);
+    });
+
     // ── POST /upload ──────────────────────────────────────────────────────────
     // Body (JSON, max 1MB):
     //   { "key": "<base64 binary>", "so": "<base64 binary>", "name": "<optional>" }
@@ -162,28 +230,34 @@ int main(int argc, char* argv[]) {
             std::string key_bytes = key_b64.empty() ? "" : base64_decode(key_b64);
             std::string so_bytes  = so_b64.empty()  ? "" : base64_decode(so_b64);
 
-            std::cout << "[UPLOAD] key=" << key_bytes.size()
-                      << "B  so=" << so_bytes.size() << "B\n";
+            // 检测文件类型
+            std::string file_ext = detect_file_type(so_bytes);
+            std::string file_type = (file_ext == ".a") ? "static library" :
+                                   (file_ext == ".so") ? "shared library" :
+                                   (file_ext == ".o") ? "object file" : "binary";
 
-            // so 保存为文件
-            std::string so_file;
+            std::cout << "[UPLOAD] key=" << key_bytes.size()
+                      << "B  so=" << so_bytes.size() << "B  type=" << file_type << "\n";
+
+            // 保存文件
+            std::string lib_file;
             if (!so_bytes.empty()) {
                 // 安全文件名
                 std::string base = name.empty() ? "lib" : fs::path(name).stem().string();
                 if (base.empty() || base == "." || base == "..") base = "lib";
-                so_file = SO_DIR + "/" + timestamp_name(base, ".so");
+                lib_file = SO_DIR + "/" + timestamp_name(base, file_ext);
 
-                std::ofstream ofs(so_file, std::ios::binary);
+                std::ofstream ofs(lib_file, std::ios::binary);
                 if (!ofs) {
                     res->writeStatus("500 Internal Server Error")
                        ->writeHeader("Content-Type", "application/json")
-                       ->end(json_resp(false, "failed to save .so file"));
+                       ->end(json_resp(false, "failed to save library file"));
                     return;
                 }
                 ofs.write(so_bytes.data(), (std::streamsize)so_bytes.size());
                 ofs.close();
-                std::cout << "[SO]  saved " << so_bytes.size()
-                          << " bytes -> " << so_file << "\n";
+                std::cout << "[LIB] saved " << so_bytes.size()
+                          << " bytes -> " << lib_file << " (" << file_type << ")\n";
             }
 
             // key 在内存中使用（此处仅打印摘要，业务逻辑在此扩展）
@@ -194,9 +268,11 @@ int main(int argc, char* argv[]) {
 
             // 构造响应
             std::string extra = R"("key_size":)" + std::to_string(key_bytes.size());
-            if (!so_file.empty()) {
-                extra += R"(,"so_file":")" + so_file + "\"";
-                extra += R"(,"so_size":)" + std::to_string(so_bytes.size());
+            if (!lib_file.empty()) {
+                extra += R"(,"lib_file":")" + lib_file + "\"";
+                extra += R"(,"lib_size":)" + std::to_string(so_bytes.size());
+                extra += R"(,"lib_type":")" + file_type + "\"";
+                extra += R"(,"file_ext":")" + file_ext + "\"";
             }
             res->writeHeader("Content-Type", "application/json")
                ->end(json_resp(true, "ok", extra));
@@ -219,6 +295,11 @@ int main(int argc, char* argv[]) {
             std::cout << "HTTPS server listening on https://0.0.0.0:" << PORT << "\n";
             std::cout << "  POST /upload  { \"key\":\"<b64>\", \"so\":\"<b64>\", \"name\":\"<opt>\" }\n";
             std::cout << "  GET  /health\n";
+            std::cout << "  GET  /list    (list uploaded libraries)\n";
+            std::cout << "\nSupported formats:\n";
+            std::cout << "  .so  - Shared library (ELF ET_DYN)\n";
+            std::cout << "  .a   - Static library (AR archive)\n";
+            std::cout << "  .o   - Object file (ELF ET_REL)\n";
         } else {
             std::cerr << "Failed to listen on port " << PORT << "\n";
             std::cerr << "Possible reasons:\n";

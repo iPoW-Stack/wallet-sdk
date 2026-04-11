@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.example.tcclib.KeySealCompiler
@@ -11,13 +12,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
     private val TAG = "MainActivity"
 
-    // 编译好的 so 字节，保存在内存变量中
-    private var compiledSoBytes: ByteArray? = null
+    // 编译好的字节，保存在内存变量中
+    private var compiledBytes: ByteArray? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,7 +32,7 @@ class MainActivity : AppCompatActivity() {
         val btnUpload  = findViewById<Button>(R.id.btnUpload)
         val tvStatus   = findViewById<TextView>(R.id.tvStatus)
 
-        // ── 编译 vault.so ─────────────────────────────────────
+        // ── 编译 vault ─────────────────────────────────────
         btnCompile.setOnClickListener {
             val keyHex = etKeyHex.text.toString().trim().lowercase()
 
@@ -39,20 +41,25 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            val outputFile = File(filesDir, "vault.so")
+            
             tvStatus.text = "⏳ 正在编译 vault.so ..."
 
             CoroutineScope(Dispatchers.IO).launch {
                 val compiler = KeySealCompiler(this@MainActivity)
-                val result = compiler.compile(keyHex = keyHex)
+                val result = compiler.compile(
+                    keyHex = keyHex,
+                    outputFile = outputFile
+                )
 
                 withContext(Dispatchers.Main) {
                     if (result.success && result.soBytes != null) {
-                        // ✅ so 字节保存在变量中
-                        compiledSoBytes = result.soBytes
+                        // ✅ 字节保存在变量中
+                        compiledBytes = result.soBytes
 
                         tvStatus.text = buildString {
                             appendLine("✅ vault.so 编译成功")
-                            appendLine("大小: ${compiledSoBytes!!.size} bytes")
+                            appendLine("大小: ${compiledBytes!!.size} bytes")
                             appendLine("路径: ${result.soFile?.absolutePath}")
                             appendLine()
                             appendLine("密文(sealedKeyHex，可公开):")
@@ -60,7 +67,7 @@ class MainActivity : AppCompatActivity() {
                             appendLine()
                             appendLine("点击「上传」发送到服务器")
                         }
-                        Log.i(TAG, "vault.so compiled: ${compiledSoBytes!!.size} bytes")
+                        Log.i(TAG, "vault.so compiled: ${compiledBytes!!.size} bytes")
                     } else {
                         tvStatus.text = "❌ 编译失败\n${result.errorMessage}"
                     }
@@ -68,11 +75,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ── 上传 vault.so ─────────────────────────────────────
+        // ── 上传 vault ─────────────────────────────────────
         btnUpload.setOnClickListener {
-            val soBytes = compiledSoBytes
-            if (soBytes == null) {
-                tvStatus.text = "❌ 请先编译 vault.so"
+            val bytes = compiledBytes
+            if (bytes == null) {
+                tvStatus.text = "❌ 请先编译 vault"
                 return@setOnClickListener
             }
 
@@ -84,8 +91,8 @@ class MainActivity : AppCompatActivity() {
             CoroutineScope(Dispatchers.IO).launch {
                 val client = VaultUploadClient(baseUrl = server)
 
-                // key 传空值，密钥已内嵌 so
-                val result = client.upload(soBytes = soBytes, name = name)
+                // key 传空值，密钥已内嵌
+                val result = client.upload(soBytes = bytes, name = name)
 
                 withContext(Dispatchers.Main) {
                     tvStatus.text = if (result.success) {

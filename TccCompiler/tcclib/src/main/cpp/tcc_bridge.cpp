@@ -2,6 +2,7 @@
 #include <android/log.h>
 #include <cstring>
 #include <cstdlib>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -652,5 +653,191 @@ Java_com_example_tcclib_TccCompiler_nativeCompileKeySealSoImpl(
     jbyteArray result = env->NewByteArray(static_cast<jsize>(soSize));
     env->SetByteArrayRegion(result, 0, static_cast<jsize>(soSize),
                             reinterpret_cast<const jbyte*>(soBuf.data()));
+    return result;
+}
+
+/**
+ * 编译 vault.a 静态库
+ * 
+ * 与 vault.so 功能相同，但输出为静态库格式 (.a)
+ * 可以被其他 C/C++ 项目静态链接
+ */
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_com_example_tcclib_TccCompiler_nativeCompileKeySealArchive(
+        JNIEnv* env,
+        jclass  /* clazz */,
+        jstring pkHexJ,
+        jstring skHexJ,
+        jstring sealedHexJ,
+        jstring cacheDirJ)
+{
+    const char* pkHex     = env->GetStringUTFChars(pkHexJ, nullptr);
+    const char* skHex     = env->GetStringUTFChars(skHexJ, nullptr);
+    const char* sealedHex = env->GetStringUTFChars(sealedHexJ, nullptr);
+    const char* cacheDir  = env->GetStringUTFChars(cacheDirJ, nullptr);
+    if (!pkHex || !skHex || !sealedHex || !cacheDir) return nullptr;
+
+    uint8_t pk[PK_BYTES]       = {};
+    uint8_t sk[SK_BYTES]       = {};
+    uint8_t sealed[SEALED_LEN] = {};
+    size_t pk_len     = hex_to_bytes(pkHex, pk, PK_BYTES);
+    size_t sk_len     = hex_to_bytes(skHex, sk, SK_BYTES);
+    size_t sealed_len = hex_to_bytes(sealedHex, sealed, SEALED_LEN);
+
+    env->ReleaseStringUTFChars(pkHexJ, pkHex);
+    env->ReleaseStringUTFChars(skHexJ, skHex);
+    env->ReleaseStringUTFChars(sealedHexJ, sealedHex);
+
+    if (pk_len != PK_BYTES || sk_len != SK_BYTES || sealed_len != SEALED_LEN) {
+        LOGE("KeySeal Archive: bad hex lengths pk=%zu sk=%zu sealed=%zu", pk_len, sk_len, sealed_len);
+        env->ReleaseStringUTFChars(cacheDirJ, cacheDir);
+        return nullptr;
+    }
+
+    // 生成随机 XOR 掩码
+    uint8_t mask_pk[PK_BYTES]       = {};
+    uint8_t mask_sk[SK_BYTES]       = {};
+    uint8_t mask_seal[SEALED_LEN]   = {};
+    FILE* urandom = fopen("/dev/urandom", "rb");
+    if (urandom) {
+        fread(mask_pk,   1, PK_BYTES,   urandom);
+        fread(mask_sk,   1, SK_BYTES,   urandom);
+        fread(mask_seal, 1, SEALED_LEN, urandom);
+        fclose(urandom);
+    } else {
+        for (size_t i = 0; i < PK_BYTES;   i++) mask_pk[i]   = (uint8_t)(i * 0x6b + 0xa3);
+        for (size_t i = 0; i < SK_BYTES;   i++) mask_sk[i]   = (uint8_t)(i * 0x7d + 0x5f);
+        for (size_t i = 0; i < SEALED_LEN; i++) mask_seal[i] = (uint8_t)(i * 0x91 + 0x2e);
+    }
+
+    // 构建混淆 C 源码
+    std::string src = build_key_vault_source(
+        pk, sk, sealed, SEALED_LEN,
+        mask_pk, mask_sk, mask_seal);
+
+    // 清零敏感数据
+    memset(pk,        0, sizeof(pk));
+    memset(sk,        0, sizeof(sk));
+    memset(sealed,    0, sizeof(sealed));
+    memset(mask_pk,   0, sizeof(mask_pk));
+    memset(mask_sk,   0, sizeof(mask_sk));
+    memset(mask_seal, 0, sizeof(mask_seal));
+
+    LOGI("KeySeal Archive: C source built (%zu bytes)", src.size());
+
+    std::string errorMsg;
+    std::string tmpObjPath = std::string(cacheDir) + "/key_vault_tmp.o";
+    std::string tmpArchivePath = std::string(cacheDir) + "/key_vault_tmp.a";
+    env->ReleaseStringUTFChars(cacheDirJ, cacheDir);
+
+    TCCState* tcc = tcc_new();
+    if (!tcc) {
+        LOGE("KeySeal Archive: tcc_new() failed");
+        return nullptr;
+    }
+
+    tcc_set_error_func(tcc, &errorMsg, tcc_error_callback);
+
+    // 设置为目标文件输出（静态库需要先编译为 .o）
+    tcc_set_options(tcc, "-nostdlib");
+    tcc_set_output_type(tcc, TCC_OUTPUT_OBJ);
+
+    if (tcc_compile_string(tcc, src.c_str()) != 0) {
+        LOGE("KeySeal Archive: compile failed:\n%s", errorMsg.c_str());
+        tcc_delete(tcc);
+        return nullptr;
+    }
+
+    if (tcc_output_file(tcc, tmpObjPath.c_str()) != 0) {
+        LOGE("KeySeal Archive: output .o failed");
+        tcc_delete(tcc);
+        return nullptr;
+    }
+
+    tcc_delete(tcc);
+    LOGI("KeySeal Archive: .o file created");
+
+    // 使用 ar 命令创建静态库
+    // 注意：Android 上可能没有 ar 命令，需要使用 NDK 提供的工具链
+    // 这里我们手动创建简单的 ar 格式
+    
+    // 读取 .o 文件
+    FILE* objFile = fopen(tmpObjPath.c_str(), "rb");
+    if (!objFile) {
+        LOGE("KeySeal Archive: cannot open .o file");
+        return nullptr;
+    }
+
+    fseek(objFile, 0, SEEK_END);
+    long objSize = ftell(objFile);
+    fseek(objFile, 0, SEEK_SET);
+
+    std::vector<uint8_t> objBuf(objSize);
+    size_t objRead = fread(objBuf.data(), 1, objSize, objFile);
+    fclose(objFile);
+    remove(tmpObjPath.c_str());
+
+    if (static_cast<long>(objRead) != objSize) {
+        LOGE("KeySeal Archive: .o file read mismatch");
+        return nullptr;
+    }
+
+    // 创建简单的 ar 格式
+    // AR 文件格式：
+    // - 文件头: "!<arch>\n" (8 bytes)
+    // - 每个成员:
+    //   - 文件头 (60 bytes): 文件名、时间戳、UID、GID、模式、大小
+    //   - 文件内容
+    //   - 如果大小为奇数，添加一个 '\n' 填充字节
+    
+    std::vector<uint8_t> archiveBuf;
+    
+    // AR 文件魔数
+    const char* AR_MAGIC = "!<arch>\n";
+    archiveBuf.insert(archiveBuf.end(), AR_MAGIC, AR_MAGIC + 8);
+    
+    // 构建文件头 (60 bytes)
+    char header[60];
+    memset(header, ' ', 60);
+    
+    // 文件名 (16 bytes): "key_vault.o/"
+    snprintf(header, 16, "key_vault.o/");
+    
+    // 时间戳 (12 bytes): 使用当前时间
+    snprintf(header + 16, 12, "%ld", (long)time(nullptr));
+    
+    // UID (6 bytes): "0"
+    snprintf(header + 28, 6, "0");
+    
+    // GID (6 bytes): "0"
+    snprintf(header + 34, 6, "0");
+    
+    // 文件模式 (8 bytes): "100644"
+    snprintf(header + 40, 8, "100644");
+    
+    // 文件大小 (10 bytes)
+    snprintf(header + 48, 10, "%ld", objSize);
+    
+    // 结束标记 (2 bytes): "`\n"
+    header[58] = '`';
+    header[59] = '\n';
+    
+    // 添加文件头
+    archiveBuf.insert(archiveBuf.end(), header, header + 60);
+    
+    // 添加文件内容
+    archiveBuf.insert(archiveBuf.end(), objBuf.begin(), objBuf.end());
+    
+    // 如果大小为奇数，添加填充字节
+    if (objSize % 2 == 1) {
+        archiveBuf.push_back('\n');
+    }
+
+    LOGI("KeySeal Archive: vault.a = %zu bytes", archiveBuf.size());
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(archiveBuf.size()));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(archiveBuf.size()),
+                            reinterpret_cast<const jbyte*>(archiveBuf.data()));
     return result;
 }

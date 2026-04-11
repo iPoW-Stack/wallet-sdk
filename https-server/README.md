@@ -109,7 +109,7 @@ openssl req -x509 -newkey rsa:4096 -nodes \
 
 ### POST /upload
 
-上传 .so 文件和密钥
+上传库文件（自动检测格式）
 
 **请求**:
 ```bash
@@ -117,15 +117,23 @@ curl -sk -X POST https://localhost:8443/upload \
   -H "Content-Type: application/json" \
   -d '{
     "key": "",
-    "so": "<base64_encoded_so_binary>",
+    "so": "<base64_encoded_binary>",
     "name": "mylib"
   }'
 ```
 
 **字段说明**:
 - `key`: 密钥的 base64 编码（可以为空字符串 `""`）
-- `so`: .so 文件的 base64 编码（必填）
+- `so`: 库文件的 base64 编码（必填，支持 .so/.a/.o）
 - `name`: 文件名前缀（可选）
+
+**支持的格式**:
+- `.so` - 共享库（ELF ET_DYN）
+- `.a` - 静态库（AR archive）
+- `.o` - 目标文件（ELF ET_REL）
+- `.bin` - 未知格式
+
+服务器会自动检测文件类型并使用正确的扩展名保存。
 
 **响应**:
 ```json
@@ -133,8 +141,55 @@ curl -sk -X POST https://localhost:8443/upload \
   "ok": true,
   "msg": "ok",
   "key_size": 0,
-  "so_file": "./uploads/libs/mylib_20260411_113045_123.so",
-  "so_size": 8192
+  "lib_file": "./uploads/libs/mylib_20260411_113045_123.a",
+  "lib_size": 8192,
+  "lib_type": "static library",
+  "file_ext": ".a"
+}
+```
+
+### GET /list
+
+列出已上传的库文件
+
+```bash
+curl -sk https://localhost:8443/list
+```
+
+**响应**:
+```json
+{
+  "ok": true,
+  "files": [
+    {
+      "name": "mylib_20260411_113045_123.a",
+      "size": 8192,
+      "ext": ".a",
+      "path": "./uploads/libs/mylib_20260411_113045_123.a"
+    },
+    {
+      "name": "test_20260411_113050_456.so",
+      "size": 16384,
+      "ext": ".so",
+      "path": "./uploads/libs/test_20260411_113050_456.so"
+    }
+  ]
+}
+```
+
+### GET /health
+
+健康检查
+
+```bash
+curl -sk https://localhost:8443/health
+```
+
+**响应**:
+```json
+{
+  "ok": true,
+  "msg": "server is running"
 }
 ```
 
@@ -148,6 +203,7 @@ curl -sk -X POST https://localhost:8443/upload \
 
 # 测试远程服务器
 ./test_upload.sh https://136.115.134.105:38443
+```
 ```
 
 ### GET /health

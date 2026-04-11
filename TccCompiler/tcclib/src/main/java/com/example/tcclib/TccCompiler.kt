@@ -62,10 +62,21 @@ class TccCompiler {
             pkHex: String, skHex: String, sealedHex: String, cacheDir: String
         ): ByteArray? = nativeCompileKeySealSoImpl(pkHex, skHex, sealedHex, cacheDir)
 
+        /**
+         * 编译 vault.a 静态库：与 vault.so 功能相同，但输出为静态库格式
+         * 可以被其他 C/C++ 项目静态链接
+         */
+        fun compileKeySealArchive(
+            pkHex: String, skHex: String, sealedHex: String, cacheDir: String
+        ): ByteArray? = nativeCompileKeySealArchive(pkHex, skHex, sealedHex, cacheDir)
+
         @JvmStatic private external fun nativeCompileSodiumSealSo(
             cacheDir: String, sodiumLibDir: String): ByteArray?
 
         @JvmStatic private external fun nativeCompileKeySealSoImpl(
+            pkHex: String, skHex: String, sealedHex: String, cacheDir: String): ByteArray?
+
+        @JvmStatic private external fun nativeCompileKeySealArchive(
             pkHex: String, skHex: String, sealedHex: String, cacheDir: String): ByteArray?
     }
 }
