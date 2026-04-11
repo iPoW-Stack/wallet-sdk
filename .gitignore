@@ -60,3 +60,21 @@ https-server/certs/key.pem
 *.a
 CMakeCache.txt
 CMakeFiles/
+
+# ═══════════════════════════════════════════════════════
+#  Android 编译产物和调试文件
+# ═══════════════════════════════════════════════════════
+*.dex
+*.apk
+*.ap_
+*.aab
+
+# Heap dumps（内存转储文件，通常很大）
+*.hprof
+
+# Proguard 混淆映射
+proguard/
+mapping.txt
+
+# Log files
+*.log
