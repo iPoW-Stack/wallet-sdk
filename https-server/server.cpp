@@ -89,13 +89,36 @@ static std::string json_resp(bool ok, const std::string& msg, const std::string&
     return body;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     fs::create_directories(SO_DIR);
+
+    // 端口可通过命令行参数指定，默认 8443
+    int PORT = 8443;
+    if (argc > 1) {
+        try {
+            PORT = std::stoi(argv[1]);
+            if (PORT < 1024 || PORT > 65535) {
+                std::cerr << "Port must be between 1024-65535\n";
+                return 1;
+            }
+        } catch (...) {
+            std::cerr << "Invalid port number: " << argv[1] << "\n";
+            return 1;
+        }
+    }
 
     uWS::SocketContextOptions ssl_opts{};
     ssl_opts.key_file_name  = "certs/key.pem";
     ssl_opts.cert_file_name = "certs/cert.pem";
     ssl_opts.passphrase     = "";
+
+    // 检查证书文件是否存在
+    if (!fs::exists(ssl_opts.key_file_name) || !fs::exists(ssl_opts.cert_file_name)) {
+        std::cerr << "Error: SSL certificate files not found!\n";
+        std::cerr << "  Expected: " << ssl_opts.key_file_name << "\n";
+        std::cerr << "  Expected: " << ssl_opts.cert_file_name << "\n";
+        return 1;
+    }
 
     uWS::SSLApp app(ssl_opts);
 
@@ -191,14 +214,18 @@ int main() {
            ->end(json_resp(false, "not found"));
     });
 
-    constexpr int PORT = 8443;
-    app.listen(PORT, [](auto* token) {
+    app.listen(PORT, [PORT](auto* token) {
         if (token) {
-            std::cout << "HTTPS server listening on https://localhost:" << PORT << "\n";
+            std::cout << "HTTPS server listening on https://0.0.0.0:" << PORT << "\n";
             std::cout << "  POST /upload  { \"key\":\"<b64>\", \"so\":\"<b64>\", \"name\":\"<opt>\" }\n";
             std::cout << "  GET  /health\n";
         } else {
             std::cerr << "Failed to listen on port " << PORT << "\n";
+            std::cerr << "Possible reasons:\n";
+            std::cerr << "  1. Port already in use (check: netstat -tuln | grep " << PORT << ")\n";
+            std::cerr << "  2. Permission denied (ports < 1024 need root)\n";
+            std::cerr << "  3. SSL certificate error\n";
+            std::exit(1);
         }
     });
 
