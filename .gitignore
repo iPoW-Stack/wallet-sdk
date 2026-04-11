@@ -32,7 +32,6 @@ local.properties
 https-server/server
 
 # 运行时上传的 so 和密钥文件（敏感数据，不入库）
-https-server/uploads/libs/
 https-server/uploads/keys/
 
 # TLS 证书和私钥（敏感，不入库）
