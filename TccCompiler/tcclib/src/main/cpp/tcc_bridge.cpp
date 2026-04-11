@@ -797,6 +797,11 @@ Java_com_example_tcclib_TccCompiler_nativeCompileKeySealArchive(
     const char* AR_MAGIC = "!<arch>\n";
     archiveBuf.insert(archiveBuf.end(), AR_MAGIC, AR_MAGIC + 8);
     
+    // 调试：打印前 16 字节
+    LOGI("KeySeal Archive: AR magic bytes: %02x %02x %02x %02x %02x %02x %02x %02x",
+         (uint8_t)AR_MAGIC[0], (uint8_t)AR_MAGIC[1], (uint8_t)AR_MAGIC[2], (uint8_t)AR_MAGIC[3],
+         (uint8_t)AR_MAGIC[4], (uint8_t)AR_MAGIC[5], (uint8_t)AR_MAGIC[6], (uint8_t)AR_MAGIC[7]);
+    
     // 构建文件头 (60 bytes)
     char header[60];
     memset(header, ' ', 60);

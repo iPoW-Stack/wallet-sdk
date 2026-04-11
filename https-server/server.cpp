@@ -84,11 +84,25 @@ static std::string timestamp_name(const std::string& prefix, const std::string& 
 static std::string detect_file_type(const std::string& data) {
     if (data.size() < 8) return ".bin";
     
+    // 调试：打印前 16 字节
+    std::cout << "[DEBUG] File header (first 16 bytes): ";
+    for (size_t i = 0; i < 16 && i < data.size(); i++) {
+        printf("%02x ", (unsigned char)data[i]);
+    }
+    std::cout << "\n";
+    std::cout << "[DEBUG] As ASCII: ";
+    for (size_t i = 0; i < 16 && i < data.size(); i++) {
+        char c = data[i];
+        std::cout << (c >= 32 && c < 127 ? c : '.');
+    }
+    std::cout << "\n";
+    
     // ELF 魔数: 0x7f 'E' 'L' 'F'
     if (data[0] == 0x7f && data[1] == 'E' && data[2] == 'L' && data[3] == 'F') {
         // 检查 ELF 类型
-        if (data.size() >= 16) {
+        if (data.size() >= 18) {
             uint16_t e_type = *reinterpret_cast<const uint16_t*>(&data[16]);
+            std::cout << "[DEBUG] ELF e_type = " << e_type << "\n";
             // ET_DYN (3) = 共享库
             if (e_type == 3) return ".so";
             // ET_REL (1) = 可重定位文件 (.o)
@@ -103,9 +117,11 @@ static std::string detect_file_type(const std::string& data) {
         data[2] == 'a' && data[3] == 'r' &&
         data[4] == 'c' && data[5] == 'h' &&
         data[6] == '>' && data[7] == '\n') {
+        std::cout << "[DEBUG] Detected AR format\n";
         return ".a";
     }
     
+    std::cout << "[DEBUG] Unknown format\n";
     return ".bin"; // 未知格式
 }
 

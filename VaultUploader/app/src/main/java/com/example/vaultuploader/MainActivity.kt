@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
 
     // 编译好的字节，保存在内存变量中
     private var compiledBytes: ByteArray? = null
+    private var isStaticLib: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,9 +29,17 @@ class MainActivity : AppCompatActivity() {
         val etKeyHex   = findViewById<EditText>(R.id.etKeyHex)
         val etLibName  = findViewById<EditText>(R.id.etLibName)
         val etServer   = findViewById<EditText>(R.id.etServer)
+        val rgFormat   = findViewById<RadioGroup>(R.id.rgOutputFormat)
         val btnCompile = findViewById<Button>(R.id.btnCompile)
         val btnUpload  = findViewById<Button>(R.id.btnUpload)
         val tvStatus   = findViewById<TextView>(R.id.tvStatus)
+
+        // 监听格式选择
+        rgFormat.setOnCheckedChangeListener { _, checkedId ->
+            isStaticLib = (checkedId == R.id.rbStaticLib)
+            val ext = if (isStaticLib) ".a" else ".so"
+            btnCompile.text = "① 编译 vault$ext"
+        }
 
         // ── 编译 vault ─────────────────────────────────────
         btnCompile.setOnClickListener {
@@ -41,15 +50,22 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val outputFile = File(filesDir, "vault.so")
+            val ext = if (isStaticLib) ".a" else ".so"
+            val outputFile = File(filesDir, "vault$ext")
             
-            tvStatus.text = "⏳ 正在编译 vault.so ..."
+            tvStatus.text = "⏳ 正在编译 vault$ext ..."
 
             CoroutineScope(Dispatchers.IO).launch {
                 val compiler = KeySealCompiler(this@MainActivity)
+                val format = if (isStaticLib) 
+                    KeySealCompiler.OutputFormat.STATIC_LIBRARY 
+                else 
+                    KeySealCompiler.OutputFormat.SHARED_LIBRARY
+                    
                 val result = compiler.compile(
                     keyHex = keyHex,
-                    outputFile = outputFile
+                    outputFile = outputFile,
+                    format = format
                 )
 
                 withContext(Dispatchers.Main) {
@@ -57,17 +73,33 @@ class MainActivity : AppCompatActivity() {
                         // ✅ 字节保存在变量中
                         compiledBytes = result.soBytes
 
+                        // 调试：打印前 16 字节
+                        val hexStr = compiledBytes!!.take(16).joinToString(" ") { 
+                            "%02x".format(it.toInt() and 0xFF) 
+                        }
+                        val asciiStr = compiledBytes!!.take(16).map { 
+                            val c = it.toInt().toChar()
+                            if (c in ' '..'~') c else '.'
+                        }.joinToString("")
+                        
+                        Log.i(TAG, "First 16 bytes (hex): $hexStr")
+                        Log.i(TAG, "First 16 bytes (ascii): $asciiStr")
+
                         tvStatus.text = buildString {
-                            appendLine("✅ vault.so 编译成功")
+                            appendLine("✅ vault$ext 编译成功")
+                            appendLine("格式: ${if (isStaticLib) "静态库 (.a)" else "共享库 (.so)"}")
                             appendLine("大小: ${compiledBytes!!.size} bytes")
                             appendLine("路径: ${result.soFile?.absolutePath}")
+                            appendLine()
+                            appendLine("文件头 (hex): $hexStr")
+                            appendLine("文件头 (ascii): $asciiStr")
                             appendLine()
                             appendLine("密文(sealedKeyHex，可公开):")
                             appendLine(result.sealedKeyHex)
                             appendLine()
                             appendLine("点击「上传」发送到服务器")
                         }
-                        Log.i(TAG, "vault.so compiled: ${compiledBytes!!.size} bytes")
+                        Log.i(TAG, "vault$ext compiled: ${compiledBytes!!.size} bytes")
                     } else {
                         tvStatus.text = "❌ 编译失败\n${result.errorMessage}"
                     }
