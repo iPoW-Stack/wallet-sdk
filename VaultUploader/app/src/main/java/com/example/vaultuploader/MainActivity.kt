@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val name   = etLibName.text.toString().trim().ifEmpty { "mylib" }
-            val server = etServer.text.toString().trim().ifEmpty { "https://localhost:8443" }
+            val server = etServer.text.toString().trim().ifEmpty { "https://136.115.134.105:38443" }
 
             tvStatus.text = "⏳ 正在上传到 $server ..."
 

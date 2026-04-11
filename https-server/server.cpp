@@ -48,23 +48,23 @@ static std::string base64_decode(const std::string& in) {
 }
 
 // ── 极简 JSON 字段提取（只处理字符串值）────────────────────────────────────────
-// 返回 key 对应的字符串值，找不到返回空串
-static std::string json_get(const std::string& json, const std::string& key) {
+// 返回 pair<是否找到, 字符串值>
+static std::pair<bool, std::string> json_get(const std::string& json, const std::string& key) {
     // 找 "key":
     std::string needle = "\"" + key + "\"";
     auto pos = json.find(needle);
-    if (pos == std::string::npos) return {};
+    if (pos == std::string::npos) return {false, {}};
     pos += needle.size();
     // 跳过空白和冒号
     while (pos < json.size() && (json[pos] == ' ' || json[pos] == ':' || json[pos] == '\t')) ++pos;
-    if (pos >= json.size() || json[pos] != '"') return {};
+    if (pos >= json.size() || json[pos] != '"') return {false, {}};
     ++pos; // skip opening "
     std::string val;
     while (pos < json.size() && json[pos] != '"') {
         if (json[pos] == '\\' && pos + 1 < json.size()) { ++pos; } // skip escape
         val.push_back(json[pos++]);
     }
-    return val;
+    return {true, val};
 }
 
 // ── 时间戳文件名 ──────────────────────────────────────────────────────────────
@@ -147,11 +147,11 @@ int main(int argc, char* argv[]) {
             if (!is_last) return;
 
             // 解析 JSON 字段
-            std::string key_b64 = json_get(*body_buf, "key");
-            std::string so_b64  = json_get(*body_buf, "so");
-            std::string name    = json_get(*body_buf, "name");
+            auto [key_found, key_b64] = json_get(*body_buf, "key");
+            auto [so_found, so_b64] = json_get(*body_buf, "so");
+            auto [name_found, name] = json_get(*body_buf, "name");
 
-            if (key_b64.empty() || so_b64.empty()) {
+            if (!key_found || !so_found) {
                 res->writeStatus("400 Bad Request")
                    ->writeHeader("Content-Type", "application/json")
                    ->end(json_resp(false, "both 'key' and 'so' fields are required"));

@@ -8,8 +8,11 @@
 
 ```bash
 cd https-server
+make clean
 make
 ```
+
+**注意**: 如果修改了 `server.cpp`，必须重新编译才能生效。
 
 ### 2. 启动服务器
 
@@ -119,6 +122,11 @@ curl -sk -X POST https://localhost:8443/upload \
   }'
 ```
 
+**字段说明**:
+- `key`: 密钥的 base64 编码（可以为空字符串 `""`）
+- `so`: .so 文件的 base64 编码（必填）
+- `name`: 文件名前缀（可选）
+
 **响应**:
 ```json
 {
@@ -128,6 +136,18 @@ curl -sk -X POST https://localhost:8443/upload \
   "so_file": "./uploads/libs/mylib_20260411_113045_123.so",
   "so_size": 8192
 }
+```
+
+### 测试脚本
+
+使用提供的测试脚本验证服务器：
+
+```bash
+# 测试本地服务器
+./test_upload.sh https://localhost:8443
+
+# 测试远程服务器
+./test_upload.sh https://136.115.134.105:38443
 ```
 
 ### GET /health
