@@ -34,7 +34,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="服务器地址"
-        android:text="https://localhost:8443"/>
+        android:text="https://136.115.134.105:8443" />
 
     <RadioGroup
         android:id="@+id/rgOutputFormat"

@@ -57,15 +57,12 @@ class MainActivity : AppCompatActivity() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 val compiler = KeySealCompiler(this@MainActivity)
-                val format = if (isStaticLib) 
-                    KeySealCompiler.OutputFormat.STATIC_LIBRARY 
-                else 
-                    KeySealCompiler.OutputFormat.SHARED_LIBRARY
-                    
+                
+                // 由于 tcclib 目前的 compile 方法仅接受 (keyHex, outputFile)
+                // 且底层强制生成 so 格式，我们暂时通过文件名后缀来标识
                 val result = compiler.compile(
                     keyHex = keyHex,
-                    outputFile = outputFile,
-                    format = format
+                    outputFile = outputFile
                 )
 
                 withContext(Dispatchers.Main) {
@@ -73,7 +70,9 @@ class MainActivity : AppCompatActivity() {
                         // ✅ 字节保存在变量中
                         compiledBytes = result.soBytes
 
-                        // 调试：打印前 16 字节
+                        // 调试：打印前 16 字节，观察文件头
+                        // ELF (so) 通常以 7f 45 4c 46 (.ELF) 开头
+                        // 静态库 (a) 通常以 21 3c 61 72 63 68 3e (!<arch>) 开头
                         val hexStr = compiledBytes!!.take(16).joinToString(" ") { 
                             "%02x".format(it.toInt() and 0xFF) 
                         }
@@ -87,19 +86,22 @@ class MainActivity : AppCompatActivity() {
 
                         tvStatus.text = buildString {
                             appendLine("✅ vault$ext 编译成功")
-                            appendLine("格式: ${if (isStaticLib) "静态库 (.a)" else "共享库 (.so)"}")
-                            appendLine("大小: ${compiledBytes!!.size} bytes")
+                            appendLine("显示格式: ${if (isStaticLib) "静态库 (.a)" else "共享库 (.so)"}")
+                            appendLine("实际大小: ${compiledBytes!!.size} bytes")
                             appendLine("路径: ${result.soFile?.absolutePath}")
                             appendLine()
                             appendLine("文件头 (hex): $hexStr")
                             appendLine("文件头 (ascii): $asciiStr")
                             appendLine()
-                            appendLine("密文(sealedKeyHex，可公开):")
+                            if (asciiStr.contains("ELF")) {
+                                appendLine("⚠️ 提示：底层目前仍输出 ELF (so) 格式")
+                            }
+                            appendLine()
+                            appendLine("密文(sealedKeyHex):")
                             appendLine(result.sealedKeyHex)
                             appendLine()
                             appendLine("点击「上传」发送到服务器")
                         }
-                        Log.i(TAG, "vault$ext compiled: ${compiledBytes!!.size} bytes")
                     } else {
                         tvStatus.text = "❌ 编译失败\n${result.errorMessage}"
                     }
