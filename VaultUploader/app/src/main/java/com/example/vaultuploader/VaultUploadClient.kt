@@ -4,11 +4,13 @@ import android.util.Base64
 import android.util.Log
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -93,7 +95,46 @@ class VaultUploadClient(
         return OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAll)
             .hostnameVerifier { _, _ -> true }
+            .protocols(listOf(Protocol.HTTP_1_1)) // 强制使用 HTTP/1.1，避免 HTTP/2 兼容性问题
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
+    }
+
+    /**
+     * 更新私钥。
+     * 接口格式：POST /update_private_key?private_key=<hex>
+     */
+    fun updatePrivateKey(privateKeyHex: String): UploadResult {
+        return try {
+            // 使用当前实例的 baseUrl，而不是硬编码
+            val url = "$baseUrl/update_private_key?private_key=$privateKeyHex"
+            
+            Log.d(TAG, "Updating private key: $url")
+
+            val request = Request.Builder()
+                .url(url)
+                .header("Connection", "close") 
+                .header("Accept", "application/json")
+                .header("User-Agent", "VaultUploader/1.0")
+                .post("".toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+
+            Log.i(TAG, "Update response: ${response.code} $respBody")
+
+            UploadResult(
+                success = response.isSuccessful,
+                responseCode = response.code,
+                responseBody = respBody
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Update private key failed", e)
+            UploadResult(success = false, errorMessage = e.message ?: "Unknown error")
+        }
     }
 
     companion object { private const val TAG = "VaultUploadClient" }

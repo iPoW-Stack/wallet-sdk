@@ -72,6 +72,12 @@
         android:layout_height="wrap_content"
         android:text="② 上传（key=空，so=base64）"/>
 
+    <Button
+        android:id="@+id/btnUpdateKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="③ 更新私钥 (Update Private Key)"/>
+
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="match_parent"

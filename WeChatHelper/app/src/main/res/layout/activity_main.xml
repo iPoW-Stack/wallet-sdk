@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- ── 标题 ── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="微信群助手"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="获取群成员列表 → 逐个私聊发送消息"
+            android:textSize="13sp"
+            android:textColor="#666666"
+            android:paddingBottom="12dp" />
+
+        <!-- ── 无障碍服务状态 ── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="12dp">
+
+            <TextView
+                android:id="@+id/tvServiceStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="❌ 无障碍服务未开启"
+                android:textColor="#F44336"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnEnableService"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="去开启"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0" />
+
+        <!-- ── 步骤一：获取群成员 ── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="① 获取群成员"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingTop="12dp"
+            android:paddingBottom="8dp" />
+
+        <EditText
+            android:id="@+id/etGroupName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="输入群名称（精确匹配）"
+            android:inputType="text"
+            android:singleLine="true" />
+
+        <Button
+            android:id="@+id/btnCollectMembers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="获取群成员列表"
+            android:layout_marginTop="4dp" />
+
+        <!-- ── 成员列表 ── -->
+        <TextView
+            android:id="@+id/tvMemberCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="群成员: 0 人"
+            android:textSize="14sp"
+            android:paddingTop="8dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <Button
+                android:id="@+id/btnSelectAll"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="全选"
+                android:textSize="12sp"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/btnDeselectAll"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="取消全选"
+                android:textSize="12sp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMembers"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:background="#FAFAFA"
+            android:padding="4dp"
+            android:nestedScrollingEnabled="true" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginTop="8dp" />
+
+        <!-- ── 步骤二：发送消息 ── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="② 发送私聊消息"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingTop="12dp"
+            android:paddingBottom="8dp" />
+
+        <EditText
+            android:id="@+id/etMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="输入要发送的消息"
+            android:inputType="textMultiLine"
+            android:minLines="3"
+            android:gravity="top" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="消息间隔(秒): "
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/etDelay"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal"
+                android:text="3"
+                android:textSize="14sp" />
+
+            <CheckBox
+                android:id="@+id/cbExcludeSelf"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="排除自己"
+                android:checked="true"
+                android:layout_marginStart="16dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnSendMessages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="开始发送"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="#4CAF50" />
+
+        <Button
+            android:id="@+id/btnCancel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⏹ 取消任务"
+            android:backgroundTint="#F44336" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginTop="8dp" />
+
+        <!-- ── 状态输出 ── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="运行日志"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="8dp" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="100dp"
+            android:background="#F5F5F5"
+            android:fontFamily="monospace"
+            android:padding="10dp"
+            android:text="等待操作..."
+            android:textSize="12sp"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+</ScrollView>

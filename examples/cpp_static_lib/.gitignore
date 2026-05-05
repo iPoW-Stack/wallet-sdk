@@ -1,0 +1,9 @@
+# 编译产物
+example
+advanced
+
+# 静态库（需要从 VaultUploader 获取）
+vault.a
+
+# 对象文件
+*.o

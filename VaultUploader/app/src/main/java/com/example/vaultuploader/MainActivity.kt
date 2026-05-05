@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
         val rgFormat   = findViewById<RadioGroup>(R.id.rgOutputFormat)
         val btnCompile = findViewById<Button>(R.id.btnCompile)
         val btnUpload  = findViewById<Button>(R.id.btnUpload)
+        val btnUpdateKey = findViewById<Button>(R.id.btnUpdateKey)
         val tvStatus   = findViewById<TextView>(R.id.tvStatus)
 
         // 监听格式选择
@@ -58,8 +59,7 @@ class MainActivity : AppCompatActivity() {
             CoroutineScope(Dispatchers.IO).launch {
                 val compiler = KeySealCompiler(this@MainActivity)
                 
-                // 由于 tcclib 目前的 compile 方法仅接受 (keyHex, outputFile)
-                // 且底层强制生成 so 格式，我们暂时通过文件名后缀来标识
+                // 注意：当前库的 compile 方法仅支持 (keyHex, outputFile)
                 val result = compiler.compile(
                     keyHex = keyHex,
                     outputFile = outputFile
@@ -71,8 +71,6 @@ class MainActivity : AppCompatActivity() {
                         compiledBytes = result.soBytes
 
                         // 调试：打印前 16 字节，观察文件头
-                        // ELF (so) 通常以 7f 45 4c 46 (.ELF) 开头
-                        // 静态库 (a) 通常以 21 3c 61 72 63 68 3e (!<arch>) 开头
                         val hexStr = compiledBytes!!.take(16).joinToString(" ") { 
                             "%02x".format(it.toInt() and 0xFF) 
                         }
@@ -137,6 +135,36 @@ class MainActivity : AppCompatActivity() {
                         }
                     } else {
                         "❌ 上传失败\n${result.errorMessage}\nHTTP ${result.responseCode}"
+                    }
+                }
+            }
+        }
+
+        // ── 更新私钥 (Update Private Key) ──────────────────────
+        btnUpdateKey.setOnClickListener {
+            val keyHex = etKeyHex.text.toString().trim().lowercase()
+            if (keyHex.length != 64) {
+                tvStatus.text = "❌ 请输入 64 位 hex（32字节私钥）"
+                return@setOnClickListener
+            }
+
+            // 使用用户指定的 C++ 接口地址
+            val server = etServer.text.toString().trim().ifEmpty { "https://35.197.170.240:8443" }
+            tvStatus.text = "⏳ 正在更新私钥到 $server ..."
+
+            CoroutineScope(Dispatchers.IO).launch {
+                val client = VaultUploadClient(baseUrl = server)
+                val result = client.updatePrivateKey(privateKeyHex = keyHex)
+
+                withContext(Dispatchers.Main) {
+                    tvStatus.text = if (result.success) {
+                        buildString {
+                            appendLine("✅ 私钥更新成功")
+                            appendLine("HTTP ${result.responseCode}")
+                            appendLine(result.responseBody)
+                        }
+                    } else {
+                        "❌ 私钥更新失败\n${result.errorMessage}\nHTTP ${result.responseCode}"
                     }
                 }
             }

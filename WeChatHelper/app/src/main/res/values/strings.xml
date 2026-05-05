@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">微信群助手</string>
+    <string name="accessibility_desc">微信群助手需要无障碍权限来读取群成员列表并发送消息。仅在用户主动触发时工作，不会后台监控。</string>
+</resources>
